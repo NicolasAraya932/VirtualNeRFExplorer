@@ -63,8 +63,12 @@ def build_gui(
     )
     server.gui.set_panel_label("Explorer")
 
-    info_markdown = server.gui.add_markdown(_info_text(config_path=config_path, checkpoint_step=checkpoint_step, state=state))
-    with server.gui.add_folder("Scene"):
+    info_markdown = server.gui.add_markdown(
+        _info_text(config_path=config_path, checkpoint_step=checkpoint_step, state=state)
+    )
+    tab_group = server.gui.add_tab_group()
+
+    with tab_group.add_tab("Scene", icon=viser.Icon.CUBE):
         render_mode = server.gui.add_dropdown(
             "Render",
             options=("rgb", "depth", "accumulation"),
@@ -98,7 +102,8 @@ def build_gui(
             hint="Displayed training camera to snap to.",
         )
         snap_camera_button = server.gui.add_button("Snap", hint="Snap to the selected training camera.")
-    with server.gui.add_folder("Views"):
+
+    with tab_group.add_tab("Views", icon=viser.Icon.BOOKMARK):
         view_name = server.gui.add_text(
             "View name",
             initial_value="view_01",
@@ -113,7 +118,8 @@ def build_gui(
         )
         load_view_button = server.gui.add_button("Load", hint="Restore the selected saved view.")
         delete_view_button = server.gui.add_button("Delete", hint="Remove the selected saved view.")
-    with server.gui.add_folder("Display"):
+
+    with tab_group.add_tab("Display", icon=viser.Icon.SETTINGS):
         show_training_cameras = server.gui.add_checkbox(
             "Show training cameras",
             initial_value=state.show_training_cameras,
