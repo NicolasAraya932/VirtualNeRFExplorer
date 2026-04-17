@@ -16,16 +16,11 @@ class GuiHandles:
     depth_quantile: viser.GuiInputHandle[float]
     capture_name: viser.GuiInputHandle[str]
     capture_button: viser.GuiButtonHandle
-    reset_view_button: viser.GuiButtonHandle
-    focus_scene_button: viser.GuiButtonHandle
-    next_camera_button: viser.GuiButtonHandle
     train_camera: viser.GuiInputHandle[str]
-    snap_camera_button: viser.GuiButtonHandle
+    navigation_actions: viser.GuiInputHandle[str]
     view_name: viser.GuiInputHandle[str]
-    save_view_button: viser.GuiButtonHandle
     saved_view: viser.GuiInputHandle[str]
-    load_view_button: viser.GuiButtonHandle
-    delete_view_button: viser.GuiButtonHandle
+    saved_view_actions: viser.GuiInputHandle[str]
     show_training_cameras: viser.GuiInputHandle[bool]
     show_world_axes: viser.GuiInputHandle[bool]
     render_resolution: viser.GuiInputHandle[int]
@@ -92,32 +87,36 @@ def build_gui(
             icon=viser.Icon.CAMERA,
             hint="Download the current client view using the chosen base name.",
         )
-        reset_view_button = server.gui.add_button("Reset", hint="Return to the default startup camera.")
-        focus_scene_button = server.gui.add_button("Focus", hint="Move to an overview centered on the scene.")
-        next_camera_button = server.gui.add_button("Next cam", hint="Jump to the next displayed training camera.")
-        train_camera = server.gui.add_dropdown(
-            "Train cam",
-            options=train_camera_options,
-            initial_value=train_camera_options[0],
-            hint="Displayed training camera to snap to.",
-        )
-        snap_camera_button = server.gui.add_button("Snap", hint="Snap to the selected training camera.")
+        with server.gui.add_folder("Navigate"):
+            train_camera = server.gui.add_dropdown(
+                "Camera",
+                options=train_camera_options,
+                initial_value=train_camera_options[0],
+                hint="Displayed training camera to snap to.",
+            )
+            navigation_actions = server.gui.add_button_group(
+                "Actions",
+                ("Reset", "Focus", "Next", "Snap"),
+                hint="Scene navigation controls.",
+            )
 
     with tab_group.add_tab("Views", icon=viser.Icon.BOOKMARK):
         view_name = server.gui.add_text(
-            "View name",
+            "Name",
             initial_value="view_01",
             hint="Name for saving the current camera pose.",
         )
-        save_view_button = server.gui.add_button("Save", hint="Store the current camera pose.")
         saved_view = server.gui.add_dropdown(
             "Saved",
             options=("None",),
             initial_value="None",
             hint="Choose a saved camera pose.",
         )
-        load_view_button = server.gui.add_button("Load", hint="Restore the selected saved view.")
-        delete_view_button = server.gui.add_button("Delete", hint="Remove the selected saved view.")
+        saved_view_actions = server.gui.add_button_group(
+            "Actions",
+            ("Save", "Load", "Delete"),
+            hint="Save, restore, or remove stored viewpoints.",
+        )
 
     with tab_group.add_tab("Display", icon=viser.Icon.SETTINGS):
         show_training_cameras = server.gui.add_checkbox(
@@ -141,16 +140,11 @@ def build_gui(
         depth_quantile=depth_quantile,
         capture_name=capture_name,
         capture_button=capture_button,
-        reset_view_button=reset_view_button,
-        focus_scene_button=focus_scene_button,
-        next_camera_button=next_camera_button,
         train_camera=train_camera,
-        snap_camera_button=snap_camera_button,
+        navigation_actions=navigation_actions,
         view_name=view_name,
-        save_view_button=save_view_button,
         saved_view=saved_view,
-        load_view_button=load_view_button,
-        delete_view_button=delete_view_button,
+        saved_view_actions=saved_view_actions,
         show_training_cameras=show_training_cameras,
         show_world_axes=show_world_axes,
         render_resolution=render_resolution,

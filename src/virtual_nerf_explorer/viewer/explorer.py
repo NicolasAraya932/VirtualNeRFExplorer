@@ -150,103 +150,100 @@ class SceneExplorer:
             )
             self._set_status(f"Downloaded capture {filename}")
 
-        @self.gui_handles.reset_view_button.on_click
+        @self.gui_handles.navigation_actions.on_click
         def _(event: viser.GuiEvent) -> None:
+            action = self.gui_handles.navigation_actions.value
             client = self._get_target_client(event.client)
             if client is None:
-                self._set_status("Reset requested without an active client")
+                self._set_status(f"{action} requested without an active client")
                 return
-            if self.scene_handles.train_camera_poses:
-                first_idx = self.scene_handles.train_camera_indices[0]
-                self._snap_to_train_camera(client, first_idx)
-                self._set_status(f"Reset to training camera {first_idx:05d}")
-            else:
+            if action == "Reset":
+                if self.scene_handles.train_camera_poses:
+                    first_idx = self.scene_handles.train_camera_indices[0]
+                    self._snap_to_train_camera(client, first_idx)
+                    self._set_status(f"Reset to training camera {first_idx:05d}")
+                else:
+                    with client.atomic():
+                        apply_camera_pose(client, self.scene_handles.overview_pose)
+                    self._submit_render_for_client(client)
+                    self._set_status("Reset to overview pose")
+                return
+
+            if action == "Focus":
                 with client.atomic():
                     apply_camera_pose(client, self.scene_handles.overview_pose)
                 self._submit_render_for_client(client)
-                self._set_status("Reset to overview pose")
+                self._set_status("Focused scene overview")
+                return
 
-        @self.gui_handles.focus_scene_button.on_click
+            if action == "Next":
+                if not self.scene_handles.train_camera_indices:
+                    self._set_status("No training cameras available for navigation")
+                    return
+                current_value = self.gui_handles.train_camera.value
+                try:
+                    current_idx = self.scene_handles.train_camera_indices.index(int(current_value))
+                except (ValueError, TypeError):
+                    current_idx = -1
+                next_idx = self.scene_handles.train_camera_indices[
+                    (current_idx + 1) % len(self.scene_handles.train_camera_indices)
+                ]
+                self.gui_handles.train_camera.value = f"{next_idx:05d}"
+                self._snap_to_train_camera(client, next_idx)
+                self._set_status(f"Snapped to training camera {next_idx:05d}")
+                return
+
+            if action == "Snap":
+                try:
+                    camera_index = int(self.gui_handles.train_camera.value)
+                except ValueError:
+                    self._set_status("No valid training camera selected")
+                    return
+                if camera_index not in self.scene_handles.train_camera_poses:
+                    self._set_status("Selected training camera is not available")
+                    return
+                self._snap_to_train_camera(client, camera_index)
+                self._set_status(f"Snapped to training camera {camera_index:05d}")
+
+        @self.gui_handles.saved_view_actions.on_click
         def _(event: viser.GuiEvent) -> None:
+            action = self.gui_handles.saved_view_actions.value
             client = self._get_target_client(event.client)
-            if client is None:
-                self._set_status("Focus requested without an active client")
-                return
-            with client.atomic():
-                apply_camera_pose(client, self.scene_handles.overview_pose)
-            self._submit_render_for_client(client)
-            self._set_status("Focused scene overview")
 
-        @self.gui_handles.next_camera_button.on_click
-        def _(event: viser.GuiEvent) -> None:
-            client = self._get_target_client(event.client)
-            if client is None or not self.scene_handles.train_camera_indices:
-                self._set_status("No training cameras available for navigation")
+            if action == "Save":
+                if client is None:
+                    self._set_status("Save view requested without an active client")
+                    return
+                name = self.gui_handles.view_name.value.strip() or f"view_{len(self.saved_views) + 1:02d}"
+                self.saved_views[name] = capture_camera_view(client)
+                self._refresh_saved_views()
+                self.gui_handles.saved_view.value = name
+                self._set_status(f"Saved view {name}")
                 return
-            current_value = self.gui_handles.train_camera.value
-            try:
-                current_idx = self.scene_handles.train_camera_indices.index(int(current_value))
-            except (ValueError, TypeError):
-                current_idx = -1
-            next_idx = self.scene_handles.train_camera_indices[(current_idx + 1) % len(self.scene_handles.train_camera_indices)]
-            self.gui_handles.train_camera.value = f"{next_idx:05d}"
-            self._snap_to_train_camera(client, next_idx)
-            self._set_status(f"Snapped to training camera {next_idx:05d}")
 
-        @self.gui_handles.snap_camera_button.on_click
-        def _(event: viser.GuiEvent) -> None:
-            client = self._get_target_client(event.client)
-            if client is None:
-                self._set_status("Snap requested without an active client")
+            if action == "Load":
+                if client is None:
+                    self._set_status("Load view requested without an active client")
+                    return
+                name = self.gui_handles.saved_view.value
+                view = self.saved_views.get(name)
+                if view is None:
+                    self._set_status("No saved view selected")
+                    return
+                with client.atomic():
+                    apply_stored_view(client, view)
+                self._submit_render_for_client(client)
+                self._set_status(f"Loaded view {name}")
                 return
-            try:
-                camera_index = int(self.gui_handles.train_camera.value)
-            except ValueError:
-                self._set_status("No valid training camera selected")
-                return
-            if camera_index not in self.scene_handles.train_camera_poses:
-                self._set_status("Selected training camera is not available")
-                return
-            self._snap_to_train_camera(client, camera_index)
-            self._set_status(f"Snapped to training camera {camera_index:05d}")
 
-        @self.gui_handles.save_view_button.on_click
-        def _(event: viser.GuiEvent) -> None:
-            client = self._get_target_client(event.client)
-            if client is None:
-                self._set_status("Save view requested without an active client")
-                return
-            name = self.gui_handles.view_name.value.strip() or f"view_{len(self.saved_views) + 1:02d}"
-            self.saved_views[name] = capture_camera_view(client)
-            self._refresh_saved_views()
-            self.gui_handles.saved_view.value = name
-            self._set_status(f"Saved view {name}")
-
-        @self.gui_handles.load_view_button.on_click
-        def _(event: viser.GuiEvent) -> None:
-            client = self._get_target_client(event.client)
-            if client is None:
-                self._set_status("Load view requested without an active client")
-                return
-            name = self.gui_handles.saved_view.value
-            view = self.saved_views.get(name)
-            if view is None:
-                self._set_status("No saved view selected")
-                return
-            with client.atomic():
-                apply_stored_view(client, view)
-            self._submit_render_for_client(client)
-            self._set_status(f"Loaded view {name}")
-
-        @self.gui_handles.delete_view_button.on_click
-        def _(_: viser.GuiEvent) -> None:
-            name = self.gui_handles.saved_view.value
-            if name not in self.saved_views:
-                self._set_status("No saved view selected")
-                return
-            del self.saved_views[name]
-            self._refresh_saved_views()
-            self._set_status(f"Deleted view {name}")
+            if action == "Delete":
+                name = self.gui_handles.saved_view.value
+                if name not in self.saved_views:
+                    self._set_status("No saved view selected")
+                    return
+                del self.saved_views[name]
+                self._refresh_saved_views()
+                self._set_status(f"Deleted view {name}")
 
         @self.gui_handles.show_training_cameras.on_update
         def _(_: viser.GuiEvent) -> None:
