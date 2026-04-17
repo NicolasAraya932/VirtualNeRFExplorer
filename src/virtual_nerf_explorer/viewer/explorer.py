@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 import threading
 import time
 from dataclasses import dataclass
 
 import viser
 
-from virtual_nerf_explorer.camera import apply_camera_pose, camera_state_from_client
+from virtual_nerf_explorer.camera import (
+    apply_camera_pose,
+    camera_state_from_client,
+    enforce_minimum_orbit_distance,
+)
+from virtual_nerf_explorer.capture import capture_scene_image
 from virtual_nerf_explorer.config import AppConfig
 from virtual_nerf_explorer.render import ClientRenderWorker, RenderRequest
 from virtual_nerf_explorer.session import LoadedSession
@@ -56,6 +62,26 @@ class SceneExplorer:
         )
 
     def _wire_gui(self) -> None:
+        @self.gui_handles.capture_button.on_click
+        def _(event: viser.GuiEvent) -> None:
+            if event.client is None:
+                self._set_status("Capture requested without an active client")
+                return
+            context = self.client_contexts.get(event.client.client_id)
+            if context is None:
+                self._set_status("Capture requested without an active render worker")
+                return
+            image = context.worker.get_latest_image()
+            if image is None:
+                self._set_status("No rendered image available yet for capture")
+                return
+            filename = capture_scene_image(
+                client=event.client,
+                image=image,
+                base_name=self.gui_handles.capture_name.value,
+            )
+            self._set_status(f"Downloaded capture {filename}")
+
         @self.gui_handles.show_training_cameras.on_update
         def _(_: viser.GuiEvent) -> None:
             self.state.show_training_cameras = self.gui_handles.show_training_cameras.value
@@ -118,14 +144,38 @@ class SceneExplorer:
             context = self.client_contexts.get(client.client_id)
             if context is None:
                 return
+            with client.atomic():
+                enforce_minimum_orbit_distance(client, self.app_config.min_orbit_distance)
             context.worker.submit(RenderRequest(camera_state=camera_state_from_client(client), phase="move"))
 
     def _handle_client_disconnect(self, client: viser.ClientHandle) -> None:
         context = self.client_contexts.pop(client.client_id, None)
         if context is not None:
             context.worker.stop()
+            context.worker.join(timeout=2.0)
         self.state.connected_clients = len(self.client_contexts)
         self._set_status("Waiting for client" if not self.client_contexts else "Client disconnected")
+
+    def _shutdown_background_processes(self) -> None:
+        children = list(mp.active_children())
+        for child in children:
+            child.terminate()
+        for child in children:
+            child.join(timeout=1.0)
+        for child in children:
+            if child.is_alive():
+                child.kill()
+                child.join(timeout=1.0)
+
+    def shutdown(self) -> None:
+        contexts = list(self.client_contexts.values())
+        for context in contexts:
+            context.worker.stop()
+        self.client_contexts.clear()
+        self.server.stop()
+        for context in contexts:
+            context.worker.join(timeout=2.0)
+        self._shutdown_background_processes()
 
     def run_forever(self) -> None:
         self._set_status("Waiting for client")
@@ -134,6 +184,4 @@ class SceneExplorer:
             while True:
                 time.sleep(0.5)
         except KeyboardInterrupt:
-            for context in self.client_contexts.values():
-                context.worker.stop()
-            self.server.stop()
+            self.shutdown()

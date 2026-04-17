@@ -111,6 +111,8 @@ virtual-nerf-explorer \
   - show or hide origin frame and grid on startup
 - `--max-display-cameras`
   - cap the number of frustums drawn in the viewer
+- `--min-orbit-distance`
+  - enforce a minimum camera-to-look-at distance to avoid the orbit controls becoming sluggish near the scene center
 - `--static-max-res`
   - maximum resolution after the camera stops moving
 - `--moving-max-res`
@@ -119,6 +121,11 @@ virtual-nerf-explorer \
 ## Notes
 
 - The explorer uses RGB only in v1.
+- Scene capture is available from the GUI via `Capture`.
+- Capture downloads the latest rendered NeRF frame already shown in the explorer instead of triggering a separate browser-side scene render.
+- The `Name` field lets you choose the download base name safely; invalid filename characters are sanitized automatically.
+- The current installed `viser` API does not expose a backend keyboard shortcut hook, so capture is implemented as a button rather than a true key binding.
 - Rendering is serialized through a lock to avoid concurrent model access from multiple clients.
 - Relative paths in moved Nerfstudio configs are repaired automatically using the config location and inferred run root.
+- The package sets `TORCHINDUCTOR_COMPILE_THREADS=1` by default before Nerfstudio imports so the viewer does not spawn a large compile-worker process pool and `Ctrl+C` remains usable.
 - This project is intentionally simpler than the full Nerfstudio viewer. The current product is a scene explorer, not a training UI.

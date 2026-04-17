@@ -34,7 +34,7 @@ class ClientRenderWorker(threading.Thread):
         image_format: str,
         on_render_status,
     ) -> None:
-        super().__init__(daemon=True)
+        super().__init__(daemon=False)
         self.client = client
         self.pipeline = pipeline
         self.render_lock = render_lock
@@ -45,6 +45,8 @@ class ClientRenderWorker(threading.Thread):
         self._request: RenderRequest | None = None
         self._running = True
         self._last_motion_time = 0.0
+        self._latest_image_lock = threading.Lock()
+        self._latest_image: np.ndarray | None = None
 
     def submit(self, request: RenderRequest) -> None:
         if request.phase == "move":
@@ -55,6 +57,12 @@ class ClientRenderWorker(threading.Thread):
     def stop(self) -> None:
         self._running = False
         self._trigger.set()
+
+    def get_latest_image(self) -> np.ndarray | None:
+        with self._latest_image_lock:
+            if self._latest_image is None:
+                return None
+            return self._latest_image.copy()
 
     def _image_size(self, aspect: float, phase: RenderPhase) -> tuple[int, int]:
         if not np.isfinite(aspect) or aspect <= 0.0:
@@ -88,6 +96,8 @@ class ClientRenderWorker(threading.Thread):
         return image
 
     def _send_image(self, image: np.ndarray, phase: RenderPhase) -> None:
+        with self._latest_image_lock:
+            self._latest_image = image.copy()
         quality = self.render_config.jpeg_quality_static if phase == "static" else self.render_config.jpeg_quality_moving
         self.client.scene.set_background_image(
             image,
@@ -106,7 +116,12 @@ class ClientRenderWorker(threading.Thread):
             request = self._request
             if request is None or not self._running:
                 continue
-            image = self._render_rgb(request.camera_state, request.phase)
-            if not self._running:
-                break
-            self._send_image(image, request.phase)
+            try:
+                image = self._render_rgb(request.camera_state, request.phase)
+                if not self._running:
+                    break
+                self._send_image(image, request.phase)
+            except Exception as exc:
+                self.on_render_status(f"Render error: {type(exc).__name__}")
+                if not self._running:
+                    break

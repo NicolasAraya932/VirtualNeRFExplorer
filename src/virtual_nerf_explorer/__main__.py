@@ -31,6 +31,12 @@ def main() -> None:
         help="Maximum number of training camera frustums to draw.",
     )
     parser.add_argument(
+        "--min-orbit-distance",
+        type=float,
+        default=1.0,
+        help="Minimum distance maintained between the viewer camera position and look-at target.",
+    )
+    parser.add_argument(
         "--static-max-res",
         type=int,
         default=960,
@@ -51,6 +57,7 @@ def main() -> None:
             show_training_cameras=args.show_training_cameras,
             show_world_axes=args.show_world_axes,
             max_display_cameras=args.max_display_cameras,
+            min_orbit_distance=args.min_orbit_distance,
             render=RenderConfig(
                 static_max_res=args.static_max_res,
                 moving_max_res=args.moving_max_res,

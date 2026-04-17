@@ -23,4 +23,5 @@ class AppConfig:
     show_training_cameras: bool = True
     show_world_axes: bool = True
     max_display_cameras: int = 24
+    min_orbit_distance: float = 1.0
     render: RenderConfig = field(default_factory=RenderConfig)

@@ -12,6 +12,8 @@ from virtual_nerf_explorer.state import ViewerState
 @dataclass(slots=True)
 class GuiHandles:
     info_markdown: viser.GuiMarkdownHandle
+    capture_name: viser.GuiInputHandle[str]
+    capture_button: viser.GuiButtonHandle
     show_training_cameras: viser.GuiInputHandle[bool]
     show_world_axes: viser.GuiInputHandle[bool]
     render_resolution: viser.GuiInputHandle[int]
@@ -47,6 +49,16 @@ def build_gui(
 
     info_markdown = server.gui.add_markdown(_info_text(config_path=config_path, checkpoint_step=checkpoint_step, state=state))
     with server.gui.add_folder("Scene"):
+        capture_name = server.gui.add_text(
+            "Name",
+            initial_value="scene_capture",
+            hint="Base filename for downloads.",
+        )
+        capture_button = server.gui.add_button(
+            "Capture",
+            icon=viser.Icon.CAMERA,
+            hint="Download the current client view using the chosen base name.",
+        )
         show_training_cameras = server.gui.add_checkbox(
             "Show training cameras",
             initial_value=state.show_training_cameras,
@@ -64,6 +76,8 @@ def build_gui(
         )
     return GuiHandles(
         info_markdown=info_markdown,
+        capture_name=capture_name,
+        capture_button=capture_button,
         show_training_cameras=show_training_cameras,
         show_world_axes=show_world_axes,
         render_resolution=render_resolution,
