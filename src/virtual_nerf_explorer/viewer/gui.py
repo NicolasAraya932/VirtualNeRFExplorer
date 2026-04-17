@@ -50,6 +50,7 @@ def build_gui(
 ) -> GuiHandles:
     server.gui.configure_theme(
         control_layout="collapsible",
+        control_width="large",
         dark_mode=True,
         show_logo=False,
         brand_color=(255, 170, 0),
