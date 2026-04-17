@@ -15,7 +15,7 @@ from virtual_nerf_explorer.camera import (
     capture_camera_view,
     enforce_minimum_orbit_distance,
 )
-from virtual_nerf_explorer.capture import capture_scene_image
+from virtual_nerf_explorer.capture import capture_scene_image, capture_tensor_export
 from virtual_nerf_explorer.config import AppConfig
 from virtual_nerf_explorer.render import ClientRenderWorker, RenderRequest
 from virtual_nerf_explorer.session import LoadedSession
@@ -149,6 +149,27 @@ class SceneExplorer:
                 base_name=self.gui_handles.capture_name.value,
             )
             self._set_status(f"Downloaded capture {filename}")
+
+        @self.gui_handles.tensor_export_button.on_click
+        def _(event: viser.GuiEvent) -> None:
+            if event.client is None:
+                self._set_status("Tensor export requested without an active client")
+                return
+            context = self.client_contexts.get(event.client.client_id)
+            if context is None:
+                self._set_status("Tensor export requested without an active render worker")
+                return
+            export = context.worker.get_latest_export()
+            if export is None:
+                self._set_status("No tensor export available yet")
+                return
+            filename = capture_tensor_export(
+                client=event.client,
+                export=export,
+                base_name=self.gui_handles.capture_name.value,
+                export_format=self.gui_handles.tensor_format.value,
+            )
+            self._set_status(f"Downloaded tensor export {filename}")
 
         @self.gui_handles.navigation_actions.on_click
         def _(event: viser.GuiEvent) -> None:

@@ -10,6 +10,7 @@ import numpy as np
 import torch
 import viser
 
+from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.viewer.utils import CameraState, get_camera
 from nerfstudio.utils import colormaps
 
@@ -25,6 +26,13 @@ class RenderRequest:
     phase: RenderPhase
     render_mode: RenderMode
     depth_quantile: float
+
+
+@dataclass(slots=True)
+class RenderExport:
+    image: np.ndarray
+    tensors: dict[str, torch.Tensor]
+    metadata: dict[str, float | int | str]
 
 
 class ClientRenderWorker(threading.Thread):
@@ -51,6 +59,7 @@ class ClientRenderWorker(threading.Thread):
         self._last_motion_time = 0.0
         self._latest_image_lock = threading.Lock()
         self._latest_image: np.ndarray | None = None
+        self._latest_export: RenderExport | None = None
 
     def submit(self, request: RenderRequest) -> None:
         if request.phase == "move":
@@ -67,6 +76,16 @@ class ClientRenderWorker(threading.Thread):
             if self._latest_image is None:
                 return None
             return self._latest_image.copy()
+
+    def get_latest_export(self) -> RenderExport | None:
+        with self._latest_image_lock:
+            if self._latest_export is None:
+                return None
+            return RenderExport(
+                image=self._latest_export.image.copy(),
+                tensors={key: value.clone() for key, value in self._latest_export.tensors.items()},
+                metadata=dict(self._latest_export.metadata),
+            )
 
     def _image_size(self, aspect: float, phase: RenderPhase) -> tuple[int, int]:
         if not np.isfinite(aspect) or aspect <= 0.0:
@@ -159,15 +178,59 @@ class ClientRenderWorker(threading.Thread):
             raise ValueError(f"Expected RGB output with 3 channels, got shape {tuple(image.shape)}")
         return image
 
+    def _ray_tensors(self, ray_bundle: RayBundle) -> dict[str, torch.Tensor]:
+        tensors: dict[str, torch.Tensor] = {
+            "ray_origins": ray_bundle.origins.detach().cpu(),
+            "ray_directions": ray_bundle.directions.detach().cpu(),
+            "ray_pixel_area": ray_bundle.pixel_area.detach().cpu(),
+        }
+        if ray_bundle.camera_indices is not None:
+            tensors["ray_camera_indices"] = ray_bundle.camera_indices.detach().cpu()
+        if ray_bundle.nears is not None:
+            tensors["ray_nears"] = ray_bundle.nears.detach().cpu()
+        if ray_bundle.fars is not None:
+            tensors["ray_fars"] = ray_bundle.fars.detach().cpu()
+        return tensors
+
+    def _build_export(
+        self,
+        *,
+        outputs: dict[str, torch.Tensor],
+        ray_bundle: RayBundle,
+        image: np.ndarray,
+        phase: RenderPhase,
+        render_mode: RenderMode,
+        depth_quantile: float,
+        image_height: int,
+        image_width: int,
+    ) -> RenderExport:
+        tensors: dict[str, torch.Tensor] = {}
+        for key, value in outputs.items():
+            if torch.is_tensor(value):
+                tensors[key] = value.detach().cpu()
+        tensors.update(self._ray_tensors(ray_bundle))
+        return RenderExport(
+            image=image.copy(),
+            tensors=tensors,
+            metadata={
+                "render_mode": render_mode,
+                "phase": phase,
+                "depth_quantile": float(depth_quantile),
+                "image_height": int(image_height),
+                "image_width": int(image_width),
+            },
+        )
+
     def _render_image(
         self,
         camera_state: CameraState,
         phase: RenderPhase,
         render_mode: RenderMode,
         depth_quantile: float,
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, RenderExport]:
         image_height, image_width = self._image_size(camera_state.aspect, phase)
         camera = get_camera(camera_state, image_height, image_width).to(self.pipeline.device)
+        ray_bundle = camera.generate_rays(camera_indices=0, keep_shape=True)
         model = self.pipeline.model
         with self.render_lock, torch.no_grad(), contextlib.nullcontext():
             was_training = model.training
@@ -177,11 +240,30 @@ class ClientRenderWorker(threading.Thread):
             finally:
                 if was_training:
                     model.train()
-        return self._convert_output_to_image(outputs, render_mode, depth_quantile)
+        image = self._convert_output_to_image(outputs, render_mode, depth_quantile)
+        export = self._build_export(
+            outputs=outputs,
+            ray_bundle=ray_bundle,
+            image=image,
+            phase=phase,
+            render_mode=render_mode,
+            depth_quantile=depth_quantile,
+            image_height=image_height,
+            image_width=image_width,
+        )
+        return image, export
 
-    def _send_image(self, image: np.ndarray, phase: RenderPhase, render_mode: RenderMode, depth_quantile: float) -> None:
+    def _send_image(
+        self,
+        image: np.ndarray,
+        export: RenderExport,
+        phase: RenderPhase,
+        render_mode: RenderMode,
+        depth_quantile: float,
+    ) -> None:
         with self._latest_image_lock:
             self._latest_image = image.copy()
+            self._latest_export = export
         quality = self.render_config.jpeg_quality_static if phase == "static" else self.render_config.jpeg_quality_moving
         self.client.scene.set_background_image(
             image,
@@ -209,7 +291,7 @@ class ClientRenderWorker(threading.Thread):
             if request is None or not self._running:
                 continue
             try:
-                image = self._render_image(
+                image, export = self._render_image(
                     request.camera_state,
                     request.phase,
                     request.render_mode,
@@ -217,7 +299,7 @@ class ClientRenderWorker(threading.Thread):
                 )
                 if not self._running:
                     break
-                self._send_image(image, request.phase, request.render_mode, request.depth_quantile)
+                self._send_image(image, export, request.phase, request.render_mode, request.depth_quantile)
             except Exception as exc:
                 self.on_render_status(f"Render error: {type(exc).__name__}")
                 if not self._running:

@@ -128,6 +128,7 @@ virtual-nerf-explorer \
 - Scene capture is available from the GUI via `Capture`.
 - Capture downloads the latest rendered NeRF frame already shown in the explorer instead of triggering a separate browser-side scene render.
 - The `Name` field lets you choose the download base name safely; invalid filename characters are sanitized automatically.
+- `Tensors -> Export` downloads the current render package as `.npz` or `.pt`, including image-space ray tensors plus model outputs such as RGB, depth, accumulation, density, and related arrays when available.
 - `Render` switches between `rgb`, `depth`, and `accumulation` outputs using the current model outputs.
 - `Depth cumsum` adjusts the cumulative-weight split used by the depth view. `0.5` is the standard median depth; lower values bias toward nearer samples and higher values bias deeper into the volume.
 - `Reset`, `Focus`, `Next cam`, and `Snap` provide basic scene-navigation controls without patching `viser`.

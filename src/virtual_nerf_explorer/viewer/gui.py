@@ -16,6 +16,8 @@ class GuiHandles:
     depth_quantile: viser.GuiInputHandle[float]
     capture_name: viser.GuiInputHandle[str]
     capture_button: viser.GuiButtonHandle
+    tensor_format: viser.GuiInputHandle[str]
+    tensor_export_button: viser.GuiButtonHandle
     train_camera: viser.GuiInputHandle[str]
     navigation_actions: viser.GuiInputHandle[str]
     view_name: viser.GuiInputHandle[str]
@@ -86,6 +88,18 @@ def build_gui(
             icon=viser.Icon.CAMERA,
             hint="Download the current client view using the chosen base name.",
         )
+        with server.gui.add_folder("Tensors"):
+            tensor_format = server.gui.add_dropdown(
+                "Format",
+                options=("npz", "pt"),
+                initial_value="npz",
+                hint="Download tensor outputs as NumPy or Torch.",
+            )
+            tensor_export_button = server.gui.add_button(
+                "Export",
+                icon=viser.Icon.DOWNLOAD,
+                hint="Download ray, color, density, and related tensors for the current render.",
+            )
         with server.gui.add_folder("Navigate"):
             train_camera = server.gui.add_dropdown(
                 "Camera",
@@ -139,6 +153,8 @@ def build_gui(
         depth_quantile=depth_quantile,
         capture_name=capture_name,
         capture_button=capture_button,
+        tensor_format=tensor_format,
+        tensor_export_button=tensor_export_button,
         train_camera=train_camera,
         navigation_actions=navigation_actions,
         view_name=view_name,
