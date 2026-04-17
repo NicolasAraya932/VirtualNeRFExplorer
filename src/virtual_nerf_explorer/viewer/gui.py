@@ -30,7 +30,6 @@ def _info_text(*, config_path: Path, checkpoint_step: int, state: ViewerState) -
     return "\n".join(
         [
             "# Scene Explorer",
-            f"- Config: `{config_path}`",
             f"- Checkpoint step: `{checkpoint_step}`",
             f"- Connected clients: `{state.connected_clients}`",
             f"- Render mode: `{state.render_mode}`",
