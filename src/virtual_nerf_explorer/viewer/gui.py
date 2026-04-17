@@ -49,6 +49,7 @@ def build_gui(
     train_camera_options: tuple[str, ...],
 ) -> GuiHandles:
     server.gui.configure_theme(
+        control_layout="collapsible",
         dark_mode=True,
         show_logo=False,
         brand_color=(255, 170, 0),
