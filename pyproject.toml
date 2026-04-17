@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "virtual-nerf-explorer"
+version = "0.2.0"
+description = "Minimal Nerfstudio-based scene explorer built on viser."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "nerfstudio",
+  "numpy>=1.24",
+  "viser",
+]
+
+[project.scripts]
+virtual-nerf-explorer = "virtual_nerf_explorer.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
