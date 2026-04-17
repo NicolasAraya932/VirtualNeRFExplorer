@@ -17,15 +17,18 @@ Implemented:
 - load any model that Nerfstudio can restore from `config.yml`
 - correct path repair for moved configs by rebasing relative paths during load
 - live RGB rerender while moving
+- depth and accumulation render modes
 - lower resolution during motion, higher resolution after motion settles
 - origin frame and world grid
 - optional sampled training camera frustums
 - click a displayed training camera to snap to that pose
+- reset/focus/next-camera navigation controls
+- saved camera viewpoints
+- image capture of the current rendered frame
 - minimal GUI for visibility toggles and render resolution
 
 Not implemented:
 - ROI selection
-- depth or accumulation visualization
 - export panels
 - training controls
 - project registry integration
@@ -117,13 +120,18 @@ virtual-nerf-explorer \
   - maximum resolution after the camera stops moving
 - `--moving-max-res`
   - maximum resolution while the camera is moving
+- `--depth-quantile`
+  - cumulative weight threshold used by the depth view; `0.5` matches Nerfstudio median depth
 
 ## Notes
 
-- The explorer uses RGB only in v1.
 - Scene capture is available from the GUI via `Capture`.
 - Capture downloads the latest rendered NeRF frame already shown in the explorer instead of triggering a separate browser-side scene render.
 - The `Name` field lets you choose the download base name safely; invalid filename characters are sanitized automatically.
+- `Render` switches between `rgb`, `depth`, and `accumulation` outputs using the current model outputs.
+- `Depth cumsum` adjusts the cumulative-weight split used by the depth view. `0.5` is the standard median depth; lower values bias toward nearer samples and higher values bias deeper into the volume.
+- `Reset`, `Focus`, `Next cam`, and `Snap` provide basic scene-navigation controls without patching `viser`.
+- Saved views are stored in memory for the current explorer session and can be loaded or deleted from the `Views` folder.
 - The current installed `viser` API does not expose a backend keyboard shortcut hook, so capture is implemented as a button rather than a true key binding.
 - Rendering is serialized through a lock to avoid concurrent model access from multiple clients.
 - Relative paths in moved Nerfstudio configs are repaired automatically using the config location and inferred run root.

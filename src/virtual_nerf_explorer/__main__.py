@@ -48,6 +48,12 @@ def main() -> None:
         default=320,
         help="Maximum render resolution used while the camera is moving.",
     )
+    parser.add_argument(
+        "--depth-quantile",
+        type=float,
+        default=0.5,
+        help="Cumulative weight threshold used for the depth view. 0.5 matches Nerfstudio median depth.",
+    )
     args = parser.parse_args()
     run_app(
         AppConfig(
@@ -61,6 +67,7 @@ def main() -> None:
             render=RenderConfig(
                 static_max_res=args.static_max_res,
                 moving_max_res=args.moving_max_res,
+                depth_quantile=args.depth_quantile,
             ),
         )
     )

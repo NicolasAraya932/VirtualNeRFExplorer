@@ -8,6 +8,7 @@ from pathlib import Path
 class RenderConfig:
     static_max_res: int = 960
     moving_max_res: int = 320
+    depth_quantile: float = 0.5
     jpeg_quality_static: int = 90
     jpeg_quality_moving: int = 60
     idle_sleep_seconds: float = 0.2

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import torch
 import viser
@@ -8,6 +10,15 @@ from nerfstudio.cameras.cameras import CameraType
 from nerfstudio.viewer.utils import CameraState
 
 VISER_NERFSTUDIO_SCALE_RATIO = 10.0
+
+
+@dataclass(slots=True)
+class StoredCameraView:
+    position: np.ndarray
+    look_at: np.ndarray
+    up_direction: np.ndarray
+    wxyz: np.ndarray
+    fov: float
 
 
 def camera_state_from_client(client: viser.ClientHandle) -> CameraState:
@@ -29,8 +40,30 @@ def camera_state_from_client(client: viser.ClientHandle) -> CameraState:
 def apply_camera_pose(client: viser.ClientHandle, c2w: np.ndarray) -> None:
     rotation = vtf.SO3.from_matrix(c2w[:3, :3])
     rotation = rotation @ vtf.SO3.from_x_radians(np.pi)
-    client.camera.position = c2w[:3, 3] * VISER_NERFSTUDIO_SCALE_RATIO
+    position = c2w[:3, 3] * VISER_NERFSTUDIO_SCALE_RATIO
+    forward = rotation.as_matrix()[:, 2]
+    client.camera.position = position
+    client.camera.look_at = position + forward * max(1.0, np.linalg.norm(position) * 0.25)
+    client.camera.up_direction = rotation.as_matrix()[:, 1]
     client.camera.wxyz = rotation.wxyz
+
+
+def capture_camera_view(client: viser.ClientHandle) -> StoredCameraView:
+    return StoredCameraView(
+        position=np.asarray(client.camera.position, dtype=np.float64),
+        look_at=np.asarray(client.camera.look_at, dtype=np.float64),
+        up_direction=np.asarray(client.camera.up_direction, dtype=np.float64),
+        wxyz=np.asarray(client.camera.wxyz, dtype=np.float64),
+        fov=float(client.camera.fov),
+    )
+
+
+def apply_stored_view(client: viser.ClientHandle, view: StoredCameraView) -> None:
+    client.camera.position = view.position
+    client.camera.look_at = view.look_at
+    client.camera.up_direction = view.up_direction
+    client.camera.wxyz = view.wxyz
+    client.camera.fov = view.fov
 
 
 def enforce_minimum_orbit_distance(client: viser.ClientHandle, minimum_distance: float) -> bool:
