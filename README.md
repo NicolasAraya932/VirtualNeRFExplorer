@@ -7,9 +7,6 @@ This repository is intentionally narrow in scope. The current goal is only to:
 - restore the trained pipeline checkpoint
 - open a live `viser` scene explorer
 - move around the rendered scene interactively
-- optionally show a reduced set of training camera frustums
-
-It is not yet an ROI tool, selection tool, or export workspace.
 
 ## v1 Scope
 
