@@ -2,12 +2,6 @@
 
 `VirtualNeRFExplorer` is a minimal `viser`-based scene explorer for Nerfstudio-compatible models.
 
-This repository is intentionally narrow in scope. The current goal is only to:
-- load a Nerfstudio `config.yml`
-- restore the trained pipeline checkpoint
-- open a live `viser` scene explorer
-- move around the rendered scene interactively
-
 ## v1 Scope
 
 Implemented:
@@ -23,13 +17,6 @@ Implemented:
 - saved camera viewpoints
 - image capture of the current rendered frame
 - minimal GUI for visibility toggles and render resolution
-
-Not implemented:
-- ROI selection
-- export panels
-- training controls
-- project registry integration
-- multi-model comparison
 
 ## Repository Layout
 
